@@ -61,20 +61,50 @@ LETTER_PRONUNCIATIONS = {
     "Y": "Why",
     "Z": "Zee",
 }
+STOP_WORDS = ["A", "AND"]
 
 
-def pick_phrase(letter1, letter2):
+def pick_phrase(letter1, letter2, past_phrases=set()):
+    # Avoid similar phrases
+    if len(past_phrases) > 1:
+        phrase_str = (
+            "Do not pick phrases similar to "
+            + " or ".join('"' + p + '"' for p in past_phrases)
+            + "."
+        )
+    else:
+        phrase_str = ""
+
     messages = [
         {
             "role": "user",
-            "content": f"I will give you two letters and then you will think of a very simple two word phrase that starts with those two letters. For example, if I give you the letters C and F, you might pick Correctional Facility. For the letters P and T, you might select Party Trick. Respond with only the two word phrase and nothing else. The letters are {letter1} and {letter2}.",
+            "content": f"I will give you two letters and then you will think of a very simple two word phrase that starts with those two letters. For example, if I give you the letters C and F, you might pick Correctional Facility. For the letters P and T, you might select Party Trick. {phrase_str} Respond with only the two word phrase and nothing else. The letters are {letter1} and {letter2}.",
         },
     ]
+
+    # Note: Decaying the temperature below prevents the model
+    #       from ignoring the phrases it was told to avoid
+
     response = ollama.chat(
-        model="wordpuzzle", messages=messages, options={"temperature": 2}
+        model="wordpuzzle",
+        messages=messages,
+        options={"temperature": 1 + 1 / (2 ** len(past_phrases))},
     )
     phrase = response["message"]["content"]
     return phrase
+
+
+def pick_phrase_with_retry(letter1, letter2, past_phrases=set(), limit_retries=True):
+    phrase = pick_phrase(letter1, letter2)
+    letter_attempts = 0
+    is_valid = is_valid_phrase(phrase, letters)
+    while (letter_attempts < LETTER_RETRIES or not limit_retries) and not is_valid:
+        sys.stderr.write(f"Invalid phrase {phrase}, trying again\n")
+        phrase = pick_phrase(letters[0], letters[1], past_phrases)
+        letter_attempts += 1
+        is_valid = is_valid_phrase(phrase, letters)
+
+    return (phrase, is_valid)
 
 
 def get_clues(phrase):
@@ -105,6 +135,7 @@ def is_valid_phrase(phrase, letters):
         and words[0][0] == letters[0]
         and words[1][0] == letters[1]
         and get_popularity(phrase) >= POPULARITY_THRESHOLD
+        and not any(word in STOP_WORDS for word in words)
     )
 
 
@@ -113,6 +144,7 @@ if __name__ == "__main__":
     parser.add_argument("--letters", nargs=2, metavar="LETTER", default=None)
     parser.add_argument("--output", default="output.wav")
     parser.add_argument("--play", action="store_true", default=False)
+    parser.add_argument("--num-puzzles", type=int, default=1)
     parser.add_argument(
         "--words", nargs="?", default="/usr/share/dict/words", const=None
     )
@@ -135,48 +167,58 @@ if __name__ == "__main__":
     # Build a model with a new system prompt
     ollama.create(model="wordpuzzle", modelfile=MODELFILE)
 
+    # Keep track of history
+    output_puzzles = 0
+    past_phrases = set()
+
     # Continue picking letters and phrases until we get a valid one
-    while True:
+    while output_puzzles < args.num_puzzles:
         # Select two letters based on the frequency table
-        letter_attempts = 1
         if args.letters is not None:
             letters = args.letters
         else:
             letters = random.choices(
                 string.ascii_uppercase, weights=counter.values(), k=2
             )
-            sys.stderr.write(f"Letters: {letters} Attempt: {letter_attempts}\n")
+            sys.stderr.write(f"Letters: {letters}\n")
+
+        # Fix the letters if we need more than one puzzle
+        if args.num_puzzles > 1:
+            args.letters = letters
 
         # Keep trying to pick a good phrase
-        phrase = pick_phrase(*letters)
-        is_valid = is_valid_phrase(phrase, letters)
-        while (
-            letter_attempts < LETTER_RETRIES or args.letters is not None
-        ) and not is_valid:
-            sys.stderr.write(f"Invalid phrase {phrase}, trying again\n")
-            phrase = pick_phrase(letters[0], letters[1])
-            letter_attempts += 1
-            is_valid = is_valid_phrase(phrase, letters)
+        phrase, is_valid = pick_phrase_with_retry(
+            letters[0], letters[1], past_phrases, limit_retries=args.letters is not None
+        )
 
-        # If we found a valid phrase, stop
-        if is_valid:
+        # If we found an invalid phrase, stop
+        if not is_valid:
             break
 
-    clues = get_clues(phrase)
-    clue_str = "\n".join(clues)
-    sys.stderr.write(f"Clues: \n{clue_str}\n")
-    pronunciation = [LETTER_PRONUNCIATIONS[letter] for letter in letters]
-    text = SSML_TEMPLATE.format(letters=pronunciation, clues=clues, phrase=phrase)
-    query_str = urlencode(
-        {"text": text, "ssml": "true", "cache": "false", "voice": VOICE},
-        quote_via=quote_plus,
-    )
+        past_phrases.add(phrase)
 
-    sys.stderr.write("Generating audio...\n")
-    urlretrieve(
-        f"http://{args.opentts_host}:{args.opentts_port}/api/tts?" + query_str,
-        args.output,
-    )
-    if args.play:
-        sys.stderr.write("Playing...\n")
-        playsound(args.output)
+        if args.num_puzzles > 1:
+            output = f"{args.output}{output_puzzles + 1}.wav"
+        else:
+            output = args.output
+
+        clues = get_clues(phrase)
+        clue_str = "\n".join(clues)
+        sys.stderr.write(f"Clues: \n{clue_str}\n")
+        pronunciation = [LETTER_PRONUNCIATIONS[letter] for letter in letters]
+        text = SSML_TEMPLATE.format(letters=pronunciation, clues=clues, phrase=phrase)
+        query_str = urlencode(
+            {"text": text, "ssml": "true", "cache": "false", "voice": VOICE},
+            quote_via=quote_plus,
+        )
+
+        sys.stderr.write("Generating audio...\n")
+        urlretrieve(
+            f"http://{args.opentts_host}:{args.opentts_port}/api/tts?" + query_str,
+            output,
+        )
+        if args.play:
+            sys.stderr.write("Playing...\n")
+            playsound(output)
+
+        output_puzzles += 1
