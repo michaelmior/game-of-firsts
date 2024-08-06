@@ -17,7 +17,7 @@ SYSTEM You are a puzzle designer who is going to help create a word puzzle. Any 
 """
 VOICE = "coqui-tts:en_ljspeech"
 SSML_TEMPLATE = """<speak>
-  The letters are {letters[0]} and {letters[1]}.
+  The letters are {letters[0]}, and {letters[1]}.
   <break time="0.5s" />
   The first clue is {clues[0]}.
   <break time="5s" />
@@ -36,10 +36,10 @@ LETTER_PRONUNCIATIONS = {
     "B": "Bee",
     "C": "Cee",
     "D": "Dee",
-    "E": "E",
+    "E": "Eeh",
     "F": "Eff",
     "G": "Gee",
-    "H": "Aitch",
+    "H": "Ayche",
     "I": "Eye",
     "J": "Jay",
     "K": "Kay",
