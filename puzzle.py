@@ -134,7 +134,7 @@ def is_popular(phrase):
         # Separately check that the uppercase version of
         # the phrase meets a second popularity threshold.
         # It's unclear why this works, but it seems effective.
-        upper_count = UPPER_POPULARITY_THRESHOLD
+        upper_count = 0
         for item in data["ngrams"]:
             ngram = " ".join(t["text"] for t in item["tokens"])
             if ngram == phrase:
