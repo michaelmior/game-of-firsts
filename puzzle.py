@@ -1,3 +1,4 @@
+import argparse
 from urllib.parse import urlencode, quote_plus
 from urllib.request import urlopen, urlretrieve
 import collections
@@ -107,12 +108,28 @@ def is_valid_phrase(phrase, letters):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--letters", nargs=2, metavar="LETTER", default=None)
+    parser.add_argument("--output", default="output.wav")
+    parser.add_argument("--play", action="store_true", default=False)
+    parser.add_argument(
+        "--words", nargs="?", default="/usr/share/dict/words", const=None
+    )
+    parser.add_argument("--opentts-host", default="localhost")
+    parser.add_argument("--opentts-port", type=int, default=5500)
+    args = parser.parse_args()
+
     # Get a frequency table for first letters of words
-    counter = collections.defaultdict(int)
-    for line in open("/usr/share/dict/words"):
-        line = line.upper()
-        if line[0] in string.ascii_uppercase:
-            counter[line[0]] += 1
+    if not args.letters:
+        counter = collections.defaultdict(int)
+        if args.words is not None:
+            for line in open(args.words):
+                line = line.upper()
+                if line[0] in string.ascii_uppercase:
+                    counter[line[0]] += 1
+        else:
+            for letter in string.ascii_uppercase:
+                counter[letter] += 1
 
     # Build a model with a new system prompt
     ollama.create(model="wordpuzzle", modelfile=MODELFILE)
@@ -120,13 +137,20 @@ if __name__ == "__main__":
     # Continue picking letters and phrases until we get a valid one
     while True:
         # Select two letters based on the frequency table
-        letters = random.choices(string.ascii_uppercase, weights=counter.values(), k=2)
+        if args.letters is not None:
+            letters = args.letters
+        else:
+            letters = random.choices(
+                string.ascii_uppercase, weights=counter.values(), k=2
+            )
         letter_attempts = 0
 
         # Keep trying to pick a good phrase
         phrase = pick_phrase(*letters)
         is_valid = is_valid_phrase(phrase, letters)
-        while letter_attempts < LETTER_RETRIES and not is_valid:
+        while (
+            letter_attempts < LETTER_RETRIES or args.letters is not None
+        ) and not is_valid:
             phrase = pick_phrase(letters[0], letters[1])
             letter_attempts += 1
             is_valid = is_valid_phrase(phrase, letters)
@@ -142,5 +166,10 @@ if __name__ == "__main__":
         {"text": text, "ssml": "true", "cache": "false", "voice": VOICE},
         quote_via=quote_plus,
     )
-    urlretrieve("http://localhost:5500/api/tts?" + query_str, "output.wav")
-    playsound("output.wav")
+
+    urlretrieve(
+        f"http://{args.opentts_host}:{args.opentts_port}/api/tts?" + query_str,
+        args.output,
+    )
+    if args.play:
+        playsound(args.output)
