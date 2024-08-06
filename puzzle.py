@@ -5,7 +5,6 @@ import json
 import random
 import string
 
-from TTS.api import TTS
 from playsound import playsound
 import ollama
 
