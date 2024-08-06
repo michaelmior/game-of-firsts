@@ -197,9 +197,10 @@ if __name__ == "__main__":
         if args.letters is not None:
             letters = args.letters
         else:
-            letters = random.choices(
-                string.ascii_uppercase, weights=counter.values(), k=2
-            )
+            weights = list(counter.values())
+            letters = random.choices(string.ascii_uppercase, weights=weights, k=1)
+            weights[string.ascii_uppercase.index(letters[0])] /= 2
+            letters += random.choices(string.ascii_uppercase, weights=weights, k=1)
             sys.stderr.write(f"Letters: {letters}\n")
 
         # Fix the letters if we need more than one puzzle
