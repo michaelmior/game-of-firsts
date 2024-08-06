@@ -99,12 +99,12 @@ def pick_phrase(letter1, letter2, past_phrases=set()):
 def pick_phrase_with_retry(letter1, letter2, past_phrases=set(), limit_retries=True):
     phrase = pick_phrase(letter1, letter2)
     letter_attempts = 0
-    is_valid = is_valid_phrase(phrase, letters)
+    is_valid = is_valid_phrase(phrase, past_phrases, letters)
     while (letter_attempts < LETTER_RETRIES or not limit_retries) and not is_valid:
         sys.stderr.write(f"Invalid phrase {phrase}, trying again\n")
         phrase = pick_phrase(letters[0], letters[1], past_phrases)
         letter_attempts += 1
-        is_valid = is_valid_phrase(phrase, letters)
+        is_valid = is_valid_phrase(phrase, past_phrases, letters)
 
     return (phrase, is_valid)
 
@@ -146,11 +146,12 @@ def is_popular(phrase):
         )
 
 
-def is_valid_phrase(phrase, letters):
+def is_valid_phrase(phrase, past_phrases, letters):
     # The phrase must be popular and contain exactly two words
     words = phrase.upper().split(" ")
     return (
-        len(words) == 2
+        phrase not in past_phrases
+        and len(words) == 2
         and words[0][0] == letters[0]
         and words[1][0] == letters[1]
         and is_popular(phrase)
