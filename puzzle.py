@@ -5,6 +5,7 @@ import collections
 import json
 import random
 import string
+import sys
 
 from playsound import playsound
 import ollama
@@ -137,13 +138,14 @@ if __name__ == "__main__":
     # Continue picking letters and phrases until we get a valid one
     while True:
         # Select two letters based on the frequency table
+        letter_attempts = 1
         if args.letters is not None:
             letters = args.letters
         else:
             letters = random.choices(
                 string.ascii_uppercase, weights=counter.values(), k=2
             )
-        letter_attempts = 0
+            sys.stderr.write(f"Letters: {letters} Attempt: {letter_attempts}\n")
 
         # Keep trying to pick a good phrase
         phrase = pick_phrase(*letters)
@@ -151,6 +153,7 @@ if __name__ == "__main__":
         while (
             letter_attempts < LETTER_RETRIES or args.letters is not None
         ) and not is_valid:
+            sys.stderr.write(f"Invalid phrase {phrase}, trying again\n")
             phrase = pick_phrase(letters[0], letters[1])
             letter_attempts += 1
             is_valid = is_valid_phrase(phrase, letters)
@@ -160,6 +163,8 @@ if __name__ == "__main__":
             break
 
     clues = get_clues(phrase)
+    clue_str = "\n".join(clues)
+    sys.stderr.write(f"Clues: \n{clue_str}\n")
     pronunciation = [LETTER_PRONUNCIATIONS[letter] for letter in letters]
     text = SSML_TEMPLATE.format(letters=pronunciation, clues=clues, phrase=phrase)
     query_str = urlencode(
@@ -167,9 +172,11 @@ if __name__ == "__main__":
         quote_via=quote_plus,
     )
 
+    sys.stderr.write("Generating audio...\n")
     urlretrieve(
         f"http://{args.opentts_host}:{args.opentts_port}/api/tts?" + query_str,
         args.output,
     )
     if args.play:
+        sys.stderr.write("Playing...\n")
         playsound(args.output)
