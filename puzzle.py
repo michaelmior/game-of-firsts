@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 from urllib.parse import urlencode, quote_plus
 from urllib.request import urlopen, urlretrieve
 import collections
@@ -216,7 +217,9 @@ if __name__ == "__main__":
         past_phrases.add(phrase)
 
         if args.num_puzzles > 1:
+            path = Path(args.output)
             output = f"{args.output}{output_puzzles + 1}.wav"
+            output = f"{path.stem}{output_puzzles + 1}{path.suffix}"
         else:
             output = args.output
 
