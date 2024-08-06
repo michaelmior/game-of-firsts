@@ -12,7 +12,8 @@ import ollama
 
 
 POPULARITY_THRESHOLD = 10_000
-LETTER_RETRIES = 5
+UPPER_POPULARITY_THRESHOLD = 1_000
+LETTER_RETRIES = 10
 MODELFILE = """
 FROM llama3.1
 SYSTEM You are a puzzle designer who is going to help create a word puzzle. Any pieces of the puzzle you generate should be short and simple and easily understandable to the average English-speaking adult anywhere in the world.
@@ -119,12 +120,29 @@ def get_clues(phrase):
     return clues[-5:]
 
 
-def get_popularity(phrase):
+def is_popular(phrase):
     # Check the popularity of the phrase via Google n-grams
     query_str = urlencode({"query": phrase}, quote_via=quote_plus)
     with urlopen("https://api.ngrams.dev/eng/search?" + query_str) as response:
         data = json.load(response)
-        return sum([item["absTotalMatchCount"] for item in data["ngrams"]])
+        total = sum([item["absTotalMatchCount"] for item in data["ngrams"]])
+
+        # Get the uppercase version of the phrase
+        phrase = phrase.upper()
+
+        # Separately check that the uppercase version of
+        # the phrase meets a second popularity threshold.
+        # It's unclear why this works, but it seems effective.
+        upper_count = UPPER_POPULARITY_THRESHOLD
+        for item in data["ngrams"]:
+            ngram = " ".join(t["text"] for t in item["tokens"])
+            if ngram == phrase:
+                upper_count = item["absTotalMatchCount"]
+                break
+
+        return (
+            total >= POPULARITY_THRESHOLD and upper_count >= UPPER_POPULARITY_THRESHOLD
+        )
 
 
 def is_valid_phrase(phrase, letters):
@@ -134,7 +152,7 @@ def is_valid_phrase(phrase, letters):
         len(words) == 2
         and words[0][0] == letters[0]
         and words[1][0] == letters[1]
-        and get_popularity(phrase) >= POPULARITY_THRESHOLD
+        and is_popular(phrase)
         and not any(word in STOP_WORDS for word in words)
     )
 
