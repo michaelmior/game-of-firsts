@@ -32,7 +32,7 @@ SSML_TEMPLATE = """<speak>
   The answer is {phrase}.
 </speak>"""
 LETTER_PRONUNCIATIONS = {
-    "A": "A",
+    "A": "Ae",
     "B": "Bee",
     "C": "Cee",
     "D": "Dee",
