@@ -1,3 +1,11 @@
+# Game of Firsts
+
+This repo is inspired by [The Initials Game](https://www.initialsgame.com/).
+It uses Ollama to generate puzzles where given two letters and several clues, you must guess a two-word phrase.
+An example is below.
+
+[example.webm](https://github.com/user-attachments/assets/0d79be8b-4bf4-4202-82cf-b39308cc9e90)
+
 # Installation
 
 Dependencies are managed with [pipenv](https://pipenv.pypa.io/en/latest/) and can be installed with `pipenv install`.
