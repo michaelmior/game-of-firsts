@@ -1,16 +1,15 @@
 import argparse
-from pathlib import Path
-from urllib.parse import urlencode, quote_plus
-from urllib.request import urlopen, urlretrieve
 import collections
 import json
 import random
 import string
 import sys
+from pathlib import Path
+from urllib.parse import quote_plus, urlencode
+from urllib.request import urlopen, urlretrieve
 
-from playsound import playsound
 import ollama
-
+from playsound import playsound
 
 POPULARITY_THRESHOLD = 10_000
 UPPER_POPULARITY_THRESHOLD = 1_000
